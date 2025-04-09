@@ -32,13 +32,13 @@ pip install pandas numpy yfinance
 ### Tüm BIST hisselerini taramak için:
 
 ```bash
-python bist_hourly_momentum_analyzer.py scan --period 15m
+python bist_momentum_analyzer.py scan --period 15m
 ```
 
 ### Tek bir hisse senedini analiz etmek için:
 
 ```bash
-python bist_hourly_momentum_analyzer.py analyze --symbol GARAN --period 1h
+python bist_momentum_analyzer.py analyze --symbol GARAN --period 1h
 ```
 
 ### Ek parametreler:
@@ -48,7 +48,7 @@ python bist_hourly_momentum_analyzer.py analyze --symbol GARAN --period 1h
 
 Örnek:
 ```bash
-python bist_hourly_momentum_analyzer.py scan --period 1d --lookback 90 --verbose
+python bist_momentum_analyzer.py scan --period 1d --lookback 90 --verbose
 ```
 
 ### Desteklenen Periyotlar:
