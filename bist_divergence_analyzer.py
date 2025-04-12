@@ -136,40 +136,48 @@ def calculate_rsi(prices, window=14):
     Dönüş:
     numpy.array: RSI değerleri
     """
-    # Fiyat değişimlerini hesapla
-    delta = np.diff(prices)
-    delta = np.insert(delta, 0, 0)  # İlk eleman için 0 ekle
-    
-    # Pozitif ve negatif değişimleri ayır
-    gain = np.where(delta > 0, delta, 0)
-    loss = np.where(delta < 0, -delta, 0)
-    
-    # Ortalama kazanç ve kayıpları hesapla
-    avg_gain = np.zeros_like(prices)
-    avg_loss = np.zeros_like(prices)
-    
-    # İlk pencere için basit ortalama
-    if len(gain) >= window:
-        avg_gain[window-1] = np.mean(gain[0:window])
-        avg_loss[window-1] = np.mean(loss[0:window])
+    try:
+        # Veriyi düzleştir (flatten) - çok boyutlu diziyi tek boyutlu hale getir
+        if isinstance(prices, np.ndarray) and prices.ndim > 1:
+            prices = prices.flatten()
         
-        # Sonraki değerler için üstel ortalama
-        for i in range(window, len(prices)):
-            avg_gain[i] = (avg_gain[i-1] * (window-1) + gain[i]) / window
-            avg_loss[i] = (avg_loss[i-1] * (window-1) + loss[i]) / window
+        # Numpy array'i pandas Series'e dönüştür
+        data = pd.Series(prices)
+        
+        # Kapanış fiyatı değişimlerini hesaplama
+        delta = data.diff()
+        
+        # Pozitif ve negatif değişimleri ayırma
+        gain = delta.copy()
+        loss = delta.copy()
+        gain[gain < 0] = 0
+        loss[loss > 0] = 0
+        loss = abs(loss)
+        
+        # İlk ortalama değerleri hesaplama
+        avg_gain = gain.rolling(window=window).mean()
+        avg_loss = loss.rolling(window=window).mean()
+        
+        # NaN değerleri temizleme
+        avg_gain = avg_gain.fillna(0)
+        avg_loss = avg_loss.fillna(0)
+        
+        # RS hesaplama (Relative Strength)
+        rs = avg_gain / avg_loss.replace(0, np.finfo(float).eps)  # Sıfıra bölmeyi önleme
+        
+        # RSI hesaplama
+        rsi = 100 - (100 / (1 + rs))
+        
+        # İlk window değeri 50 olarak ayarla (nötr RSI)
+        rsi[:window] = 50
+        
+        # Numpy array'e dönüştür
+        return rsi.values
     
-    # RS ve RSI hesaplama
-    rs = np.zeros_like(prices)
-    rsi = np.zeros_like(prices)
-    
-    for i in range(window, len(prices)):
-        if avg_loss[i] == 0:
-            rs[i] = 100
-        else:
-            rs[i] = avg_gain[i] / avg_loss[i]
-        rsi[i] = 100 - (100 / (1 + rs[i]))
-    
-    return rsi
+    except Exception as e:
+        print(f"RSI hesaplama hatası: {e}")
+        # Hata durumunda varsayılan değerler dön
+        return np.ones_like(prices) * 50
 
 def download_stock_data(symbol, period='1d', lookback_days=180):
     """
@@ -365,6 +373,12 @@ def analyze_stock_divergence(symbol, period='1d', lookback_days=180, min_window=
     # Son veri tarihini kaydet
     last_date = data.index[-1] if len(data) > 0 else None
     
+    # Son değerleri hesapla
+    last_close = close_prices[-1] if len(close_prices) > 0 else 0
+    last_rsi = rsi_values[-1] if len(rsi_values) > 0 else 0
+    last_macd = macd_values[-1] if len(macd_values) > 0 else 0
+    last_signal = signal_values[-1] if len(signal_values) > 0 else 0
+    
     # Sonuçları dön
     return {
         'Symbol': symbol,
@@ -380,7 +394,11 @@ def analyze_stock_divergence(symbol, period='1d', lookback_days=180, min_window=
         'Divergence_Count': total_divergence_count,
         'Has_RSI_Divergence': has_rsi_divergence,
         'Has_MACD_Divergence': has_macd_divergence,
-        'Last_Date': last_date
+        'Last_Date': last_date,
+        'Last_Close': last_close,
+        'RSI': last_rsi,
+        'MACD': last_macd,
+        'Signal': last_signal
     }
 
 def scan_bist_for_divergences(period='1d', endeks="bist30", lookback_days=180, min_window=5, divergence_window=20, recent_days=None, verbose=False):
